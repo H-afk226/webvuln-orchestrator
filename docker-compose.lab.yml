@@ -1,0 +1,37 @@
+services:
+  juiceshop:
+    image: bkimminich/juice-shop:latest
+    container_name: vuln-juiceshop
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks: [vulnlab]
+    restart: unless-stopped
+
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    container_name: vuln-dvwa
+    ports:
+      - "127.0.0.1:8081:80"
+    networks: [vulnlab]
+    restart: unless-stopped
+
+  webgoat:
+    image: webgoat/webgoat:latest
+    container_name: vuln-webgoat
+    ports:
+      - "127.0.0.1:8082:8080"
+    networks: [vulnlab]
+    restart: unless-stopped
+
+  bwapp:
+    image: raesene/bwapp:latest
+    container_name: vuln-bwapp
+    ports:
+      - "127.0.0.1:8083:80"
+    networks: [vulnlab]
+    restart: unless-stopped
+
+networks:
+  vulnlab:
+    name: vulnlab
+    driver: bridge

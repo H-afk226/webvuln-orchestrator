@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+results/**
+!results/.gitkeep
+!results/samples/
+config/local.yml
+.DS_Store
