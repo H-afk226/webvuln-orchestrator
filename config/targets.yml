@@ -1,0 +1,20 @@
+# Scope allowlist — scanning anything not listed here is refused.
+allowlist:
+  - juiceshop
+  - dvwa
+  - webgoat
+  - bwapp
+
+targets:
+  juiceshop:
+    base_url: "http://juiceshop:3000"
+    tech: "Node.js / Angular SPA"
+  dvwa:
+    base_url: "http://dvwa:80"
+    tech: "PHP / MySQL"
+  webgoat:
+    base_url: "http://webgoat:8080/WebGoat"
+    tech: "Java / Spring"
+  bwapp:
+    base_url: "http://bwapp:80"
+    tech: "PHP / MySQL"

@@ -1,3 +1,4 @@
+name: vulnlab
 services:
   juiceshop:
     image: bkimminich/juice-shop:latest

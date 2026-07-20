@@ -1,0 +1,33 @@
+name: vulnscan
+services:
+  zap:
+    image: zaproxy/zap-stable:latest
+    container_name: scan-zap
+    command: >
+      zap.sh -daemon
+      -host 0.0.0.0 -port 8090
+      -config api.key=${ZAP_API_KEY:-changeme}
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
+    ports:
+      - "127.0.0.1:8090:8090"
+    networks: [vulnlab]
+    restart: unless-stopped
+
+  orchestrator:
+    build: .
+    container_name: scan-orchestrator
+    depends_on: [zap]
+    environment:
+      ZAP_HOST: zap
+      ZAP_PORT: "8090"
+      ZAP_API_KEY: ${ZAP_API_KEY:-changeme}
+    volumes:
+      - ./results:/app/results
+      - ./config:/app/config:ro
+      - ./src:/app/src
+    networks: [vulnlab]
+
+networks:
+  vulnlab:
+    external: true
