@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         procps \
         perl \
         libnet-ssleay-perl \
+        libjson-perl \
         openssl \
         ca-certificates \
         bash \
