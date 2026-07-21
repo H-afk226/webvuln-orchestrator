@@ -9,6 +9,9 @@ targets:
   juiceshop:
     base_url: "http://juiceshop:3000"
     tech: "Node.js / Angular SPA"
+    seed_urls:
+      - "http://juiceshop:3000/rest/products/search?q=test"
+      - "http://juiceshop:3000/rest/user/login"
   dvwa:
     base_url: "http://dvwa:80"
     tech: "PHP / MySQL"

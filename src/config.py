@@ -18,6 +18,7 @@ class Target(BaseModel):
     name: str
     base_url: str
     tech: str = ""
+    seed_urls: list[str] = []
 
 
 class TargetConfig(BaseModel):
