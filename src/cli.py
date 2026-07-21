@@ -115,5 +115,80 @@ def scan(
     console.print(f"\n[bold green]Written[/] {out}")
 
 
+@app.command("report")
+def report(
+    target: str = typer.Argument(..., help="Target to report on"),
+    out: str = typer.Option("", help="Output path (default: results/report-<target>.html)"),
+) -> None:
+    """Correlate all scan results for a target and render an HTML report."""
+    from src.correlate import correlate, load_all
+    from src.report.html import render
+
+    results = load_all(RESULTS_DIR, target=target)
+    if not results:
+        console.print(f"[yellow]No results found for '{target}'.[/]")
+        raise typer.Exit(code=1)
+
+    corr = correlate(results, target)
+    out_path = Path(out) if out else RESULTS_DIR / f"report-{target}.html"
+    render(corr, out_path)
+
+    table = Table(title=f"Correlation summary — {target}")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_row("Scanners", str(len(results)))
+    table.add_row("Raw findings", str(corr.raw_count))
+    table.add_row("Unique findings", str(corr.unique_count))
+    table.add_row("Duplication", f"{corr.dedup_ratio:.0f}%")
+    table.add_row("Multi-tool corroborated", str(corr.corroborated_count))
+    console.print(table)
+    console.print(f"\n[bold green]Report written[/] {out_path}")
+
+
+
+
+@app.command("reparse")
+def reparse(target: str = typer.Argument(..., help="Target to re-parse")) -> None:
+    """Re-parse stored raw scanner output with the current parsers.
+
+    Parser fixes made after a scan would otherwise require re-scanning.
+    Because raw output is preserved, findings can be regenerated in
+    seconds instead of hours.
+    """
+    import json as _json
+    from src.config import load_config
+    from src.scanners import REGISTRY
+
+    t = load_config().get(target)
+    updated = 0
+
+    for run_dir in sorted(RESULTS_DIR.glob(f"{target}*/")):
+        rf = run_dir / "results.json"
+        if not rf.exists():
+            continue
+        data = _json.loads(rf.read_text())
+        changed = False
+
+        for entry in data:
+            tool = entry.get("tool")
+            raw = entry.get("raw_output_path")
+            if tool not in REGISTRY or not raw or not Path(raw).exists():
+                continue
+            scanner = REGISTRY[tool](run_dir=run_dir)
+            findings = scanner._parse(Path(raw), t)
+            for f in findings:
+                f.tool = tool
+                f.target = target
+            entry["findings"] = [_json.loads(f.model_dump_json()) for f in findings]
+            changed = True
+
+        if changed:
+            rf.write_text(_json.dumps(data, indent=2))
+            updated += 1
+            console.print(f"  reparsed {run_dir.name}")
+
+    console.print(f"[bold green]Updated[/] {updated} run(s)")
+
+
 if __name__ == "__main__":
     app()

@@ -33,9 +33,15 @@ class SqlmapScanner(Scanner):
         out_dir = self.run_dir / "sqlmap-out"
         raw = self.run_dir / "sqlmap.log"
 
+        # Seed URLs carry query parameters the crawler cannot discover:
+        # on an SPA the vulnerable endpoints are invoked by JavaScript,
+        # not linked in HTML, so crawling from the homepage reaches
+        # nothing injectable.
+        urls = target.seed_urls or [target.base_url]
+
         cmd = [
             "sqlmap",
-            "-u", target.base_url,
+            "-u", ",".join(urls) if len(urls) == 1 else urls[0],
             "--crawl", "2",
             "--batch",
             "--random-agent",
@@ -52,9 +58,16 @@ class SqlmapScanner(Scanner):
             if self.session.token:
                 cmd += ["--headers", f"Authorization: Bearer {self.session.token}"]
 
-        proc = self._run(cmd)
-        raw.write_text(proc.stdout + "\n--- STDERR ---\n" + proc.stderr)
-        return proc.returncode, raw
+        combined, rc = [], 0
+        for u in urls:
+            run_cmd = [c for c in cmd]
+            run_cmd[run_cmd.index("-u") + 1] = u
+            p = self._run(run_cmd)
+            combined.append(f"=== {u} ===\n{p.stdout}\n{p.stderr}")
+            rc = rc or p.returncode
+
+        raw.write_text("\n".join(combined))
+        return rc, raw
 
     def _parse(self, raw_path: Path, target: Target) -> list[Finding]:
         findings: list[Finding] = []

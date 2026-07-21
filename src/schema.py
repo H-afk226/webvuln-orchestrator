@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 from enum import Enum
+from typing import ClassVar
 from urllib.parse import urlparse, urlunparse
 
 from pydantic import BaseModel, Field
@@ -96,6 +97,28 @@ class Finding(BaseModel):
         return hashlib.sha256(basis.encode()).hexdigest()[:16]
 
 
+    # CWEs describing site-wide configuration rather than a specific
+    # endpoint. For these the URL is incidental: two tools reporting a
+    # missing header at different paths have found the same issue.
+    SITEWIDE_CWES: ClassVar[set[int]] = {
+        16, 200, 264, 319, 530, 548, 614, 693, 942, 1004, 1021, 1104, 1188, 1395
+    }
+
+    @property
+    def class_fingerprint(self) -> str:
+        """Location-insensitive fingerprint for site-wide issues.
+
+        Falls back to the full fingerprint for endpoint-specific
+        vulnerabilities, where the location *is* the vulnerability.
+        """
+        if self.cwe_id and self.cwe_id in self.SITEWIDE_CWES:
+            return hashlib.sha256(f"sitewide|{self.cwe_id}".encode()).hexdigest()[:16]
+        return self.fingerprint
+
+
+    # CWEs describing site-wide configuration rather than a specific
+    # endpoint. For these the URL is incidental: two tools reporting a
+    # missing header at different paths have found the same issue.
 class ScanResult(BaseModel):
     """Everything produced by one tool against one target."""
 
