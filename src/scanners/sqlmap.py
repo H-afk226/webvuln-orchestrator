@@ -46,6 +46,12 @@ class SqlmapScanner(Scanner):
             "--flush-session",
             "--answers", "quit=N,crack=N,dict=N,continue=Y",
         ]
+        if self.session:
+            if self.session.cookies:
+                cmd += ["--cookie", self.session.cookie_string]
+            if self.session.token:
+                cmd += ["--headers", f"Authorization: Bearer {self.session.token}"]
+
         proc = self._run(cmd)
         raw.write_text(proc.stdout + "\n--- STDERR ---\n" + proc.stderr)
         return proc.returncode, raw

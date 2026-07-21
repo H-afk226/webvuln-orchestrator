@@ -10,6 +10,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from src.auth import AuthenticationError, authenticate
 from src.config import ScopeViolation, load_config
 
 app = typer.Typer(add_completion=False, help="Web vulnerability scan orchestrator")
@@ -51,6 +52,7 @@ def check_scope(target: str) -> None:
 def scan(
     target: str = typer.Argument(..., help="Target name from config/targets.yml"),
     tools: str = typer.Option("", help="Comma-separated tool names (default: all)"),
+    auth: bool = typer.Option(True, help="Authenticate before scanning, if configured"),
 ) -> None:
     """Run scanners against a target. Scanners are registered in Step 4."""
     cfg = load_config()
@@ -73,8 +75,20 @@ def scan(
         console.print("[yellow]No scanners registered yet.[/] Complete Step 4.")
         raise typer.Exit(code=0)
 
+    session = None
+    if auth and t.auth:
+        try:
+            session = authenticate(t)
+            console.print(f"[green]authenticated[/] {session.describe()}")
+        except AuthenticationError as exc:
+            console.print(f"[bold red]auth failed[/] {exc}")
+            raise typer.Exit(code=3)
+    elif t.auth:
+        console.print("[yellow]running unauthenticated[/] (--no-auth)")
+
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = RESULTS_DIR / f"{target}-{stamp}"
+    suffix = "auth" if session else "noauth"
+    run_dir = RESULTS_DIR / f"{target}-{suffix}-{stamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"[bold]Target:[/] {t.name} ({t.base_url})")
     console.print(f"[bold]Output:[/] {run_dir}\n")
@@ -82,7 +96,7 @@ def scan(
     all_results = []
     for tool_name in selected:
         console.print(f"[cyan]running[/] {tool_name} ...")
-        scanner = REGISTRY[tool_name](run_dir=run_dir)
+        scanner = REGISTRY[tool_name](run_dir=run_dir, session=session)
         result = scanner.scan(t)
         all_results.append(result)
 

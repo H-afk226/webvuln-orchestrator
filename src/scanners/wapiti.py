@@ -71,10 +71,58 @@ class WapitiScanner(Scanner):
             "--max-scan-time", str(self.timeout - 120),
             "--scope", "folder",
             "--verify-ssl", "0",
+            "-m", "sql,xss,exec,file,csrf,redirect,xxe,ssrf,backup,htaccess,cookieflags,http_headers,csp",
+            "--level", "2",
         ]
+
+        # Authenticated scanning: pass the session as request headers.
+        # Wapiti's JSON cookie-jar format is version-specific and was
+        # silently ignored; an explicit Cookie header is reliable.
+        if self.session:
+            if self.session.cookies:
+                cmd += ["-H", f"Cookie: {self.session.cookie_string}"]
+            if self.session.token:
+                cmd += ["-H", f"Authorization: Bearer {self.session.token}"]
+
+        # Exclude session-destroying endpoints. A crawler that hits
+        # /logout.php loses its session and silently continues scanning
+        # unauthenticated -- producing results indistinguishable from an
+        # unauthenticated run.
+        if self.session:
+            for path in ("logout", "logout.php", "signout", "log-out"):
+                cmd += ["-x", f"{target.base_url.rstrip('/')}/{path}"]
+
+        # Seed URLs are handled as separate focused runs below: passing
+        # them via --start adds them to the crawl but strips query
+        # parameters, leaving nothing for the attack modules to inject
+        # into. Running each seed as its own -u with --scope url
+        # preserves the parameters.
         proc = self._run(cmd)
         if not raw.exists():
             raw.write_text(json.dumps({"vulnerabilities": {}}))
+
+        # One focused run per seed URL, merged into the main report.
+        merged = json.loads(raw.read_text())
+        for i, seed in enumerate(target.seed_urls):
+            seed_out = self.run_dir / f"wapiti-seed{i}.json"
+            seed_cmd = [c for c in cmd]
+            seed_cmd[seed_cmd.index("-u") + 1] = seed
+            seed_cmd[seed_cmd.index("-o") + 1] = str(seed_out)
+            if "--scope" in seed_cmd:
+                seed_cmd[seed_cmd.index("--scope") + 1] = "url"
+            self._run(seed_cmd)
+
+            if not seed_out.exists():
+                continue
+            try:
+                sub = json.loads(seed_out.read_text())
+            except json.JSONDecodeError:
+                continue
+            for cat, entries in (sub.get("vulnerabilities") or {}).items():
+                merged.setdefault("vulnerabilities", {}).setdefault(cat, [])
+                merged["vulnerabilities"][cat].extend(entries or [])
+
+        raw.write_text(json.dumps(merged, indent=2))
         return proc.returncode, raw
 
     def _parse(self, raw_path: Path, target: Target) -> list[Finding]:

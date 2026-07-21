@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.auth import Session
 from src.config import Target
 from src.schema import Finding, ScanResult
 
@@ -24,9 +25,15 @@ class Scanner(ABC):
     name: str = "unnamed"
     default_timeout: int = 900   # seconds
 
-    def __init__(self, run_dir: Path | None = None, timeout: int | None = None):
+    def __init__(
+        self,
+        run_dir: Path | None = None,
+        timeout: int | None = None,
+        session: "Session | None" = None,
+    ):
         self.run_dir = run_dir or RESULTS_DIR
         self.timeout = timeout or self.default_timeout
+        self.session = session          # None = unauthenticated scan
         self.run_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- subclasses implement these two -----------------------------
