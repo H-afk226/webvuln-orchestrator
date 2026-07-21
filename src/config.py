@@ -14,11 +14,27 @@ class ScopeViolation(Exception):
     """Raised when a scan is requested against a target outside the allowlist."""
 
 
+class AuthConfig(BaseModel):
+    """Credentials and mechanism for authenticating to a target."""
+
+    type: str                      # "form" | "json"
+    login_url: str
+    username: str
+    password: str
+    username_field: str = "username"
+    password_field: str = "password"
+    extra_fields: dict[str, str] = {}
+    csrf_field: str | None = None
+    logged_in_indicator: str | None = None
+    token_path: str | None = None  # dotted path into a JSON login response
+
+
 class Target(BaseModel):
     name: str
     base_url: str
     tech: str = ""
     seed_urls: list[str] = []
+    auth: AuthConfig | None = None
 
 
 class TargetConfig(BaseModel):
